@@ -18,34 +18,58 @@ Shows a live markdown preview of the current buffer's `.md` file using the cli t
 }
 ```
 
+To install `gh-markdown-preview` using the [GitHub gh cli](https://github.com/cli/cli#installation), [refer](https://github.com/yusukebe/gh-markdown-preview#installation)
+
+```bash
+gh extension install yusukebe/gh-markdown-preview
+```
+
+> [!WARNING]
+> `gh markdown-preview` works only when online as it uses the GitHub API for preview. Use the hard fork [gfm](https://github.com/thiagokokada/gh-gfm-preview) for offline only usage.
+
 ## Usage
 
 Call the preview function to launch a preview for the current buffer in your default browser:
 
 ```lua
-require("moo").preview()
+:lua require("moo").preview()
 ```
 
 To list all previews for the current Neovim instance:
 
 ```lua
-require("moo").list_preview()
+:lua require("moo").list_previews()
 ```
 
 To kill preview for the current buffer:
 
 ```lua
-require("moo").kill_preview()
+:lua require("moo").kill_preview()
 ```
 
 To kill all previews for the current Neovim instance:
 
 ```lua
-require("moo").kill_all_previews()
+:lua require("moo").kill_all_previews()
 ```
 
 ## Configuration
 
+### Options
+
+These are implemented in reference to `gh markdown-preview --help`
+
+```lua
+opts = {
+  dark_mode = false, -- Force dark mode (Default: false)
+  light_mode = false, -- Force light mode (Default: false)
+  disable_auto_open = false, -- Don't auto-open browser (Default: false)
+  disable_reload = false, -- Disable live reloading (Default: false)
+  host = 'localhost', -- Hostname this server will bind (Default: 'localhost')
+  port = 3333, -- TCP port number of this server (Default: 3333)
+  markdown_mode = false, --  Force "markdown" mode (Rather than the Default: "gfm")
+}
+```
 
 ### Keybinds
 
@@ -56,7 +80,7 @@ keys = {
     function()
       require('moo').preview()
     end,
-    desc = 'Markdown preview',
+    desc = '[M]ar[k]down [P]review',
     mode = 'n',
   },
 
@@ -64,26 +88,22 @@ keys = {
 }
 ```
 
-## Example Configuration I Use
+## Example Configuration for lazy.nvim
 
 ```lua
 return {
   'dpi0/moo.nvim',
+  ft = 'markdown', -- Only load the plugin for `.md` files
+  opts = {
+    markdown_mode = true, -- Force "markdown" mode (Default: false)
+  },
   keys = {
     {
       '<leader>mkp',
       function()
         require('moo').preview()
       end,
-      desc = 'Markdown preview',
-      mode = 'n',
-    },
-    {
-      '<leader>mkk',
-      function()
-        require('moo').kill_preview()
-      end,
-      desc = 'Kill preview for current buffer',
+      desc = '[M]ar[k]down [P]review',
       mode = 'n',
     },
     {
@@ -91,7 +111,23 @@ return {
       function()
         require('moo').list_previews()
       end,
-      desc = 'List all servers',
+      desc = '[M]ar[k]down [L]ist Previews',
+      mode = 'n',
+    },
+    {
+      '<leader>mkk',
+      function()
+        require('moo').kill_preview()
+      end,
+      desc = '[M]ar[k]down [K]ill Current Buffer Preview',
+      mode = 'n',
+    },
+    {
+      '<leader>mkK',
+      function()
+        require('moo').kill_all_previews()
+      end,
+      desc = '[M]ar[k]down [K]ill All Previews',
       mode = 'n',
     },
   },
