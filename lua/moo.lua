@@ -1,6 +1,18 @@
 -- moo.nvim - GitHub Markdown Preview Manager
 local M = {}
 
+-- Default configuration
+M.config = {
+	dark_mode = false,
+	light_mode = false,
+	disable_auto_open = false,
+	disable_reload = false,
+	host = "localhost",
+	port = 3333,
+	markdown_mode = false,
+	verbose = false,
+}
+
 -- Store active preview jobs
 local active_jobs = {}
 
@@ -25,6 +37,48 @@ end
 -- Notify user
 local function notify(msg, level)
 	vim.notify("[moo.nvim] " .. msg, level or vim.log.levels.INFO)
+end
+
+-- Build command arguments from config
+local function build_args(filepath)
+	local args = { "gh", "markdown-preview" }
+
+	if M.config.dark_mode then
+		table.insert(args, "--dark-mode")
+	end
+
+	if M.config.light_mode then
+		table.insert(args, "--light-mode")
+	end
+
+	if M.config.disable_auto_open then
+		table.insert(args, "--disable-auto-open")
+	end
+
+	if M.config.disable_reload then
+		table.insert(args, "--disable-reload")
+	end
+
+	if M.config.host ~= "localhost" then
+		table.insert(args, "--host")
+		table.insert(args, M.config.host)
+	end
+
+	if M.config.port ~= 3333 then
+		table.insert(args, "--port")
+		table.insert(args, tostring(M.config.port))
+	end
+
+	if M.config.markdown_mode then
+		table.insert(args, "--markdown-mode")
+	end
+
+	if M.config.verbose then
+		table.insert(args, "--verbose")
+	end
+
+	table.insert(args, filepath)
+	return args
 end
 
 -- Start preview for current buffer
@@ -122,6 +176,11 @@ function M.kill_all_previews()
 
 	active_jobs = {}
 	notify("Stopped " .. count .. " preview(s).", vim.log.levels.INFO)
+end
+
+-- Setup function for configuration
+function M.setup(opts)
+	M.config = vim.tbl_deep_extend("force", M.config, opts or {})
 end
 
 return M
