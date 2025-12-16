@@ -1,7 +1,5 @@
--- moo.nvim - GitHub Markdown Preview Manager
 local M = {}
 
--- Default configuration
 M.config = {
 	dark_mode = false,
 	light_mode = false,
@@ -12,10 +10,8 @@ M.config = {
 	markdown_mode = false,
 }
 
--- Store active preview jobs
 local active_jobs = {}
 
--- Check if gh markdown-preview is available
 local function has_gh_preview()
 	local handle = io.popen("gh markdown-preview --help 2>&1")
 	local result = handle:read("*a")
@@ -23,22 +19,24 @@ local function has_gh_preview()
 	return not result:match("unknown command") and not result:match("command not found")
 end
 
--- Get current buffer file path
 local function get_current_file()
 	return vim.api.nvim_buf_get_name(0)
 end
 
--- Check if current buffer is markdown
 local function is_markdown()
 	return vim.bo.filetype == "markdown" or vim.bo.filetype == "md"
 end
 
--- Notify user
 local function notify(msg, level)
 	vim.notify("[moo.nvim] " .. msg, level or vim.log.levels.INFO)
 end
 
--- Build command arguments from config
+local function parse_port_from_output(output)
+	-- Look for "Accepting connections at http://localhost:PORT/"
+	local port = output:match("Accepting connections at http://[^:]+:(%d+)")
+	return port and tonumber(port) or nil
+end
+
 local function build_args(filepath)
 	local args = { "gh", "markdown-preview" }
 
@@ -76,7 +74,6 @@ local function build_args(filepath)
 	return args
 end
 
--- Start preview for current buffer
 function M.preview()
 	if not has_gh_preview() then
 		notify(
@@ -97,31 +94,89 @@ function M.preview()
 		return
 	end
 
-	-- Check if preview already exists for this file
 	if active_jobs[filepath] then
-		notify("Preview already running for " .. vim.fn.fnamemodify(filepath, ":t"), vim.log.levels.WARN)
+		local job_info = active_jobs[filepath]
+		if job_info.port then
+			local host = M.config.host
+			notify(
+				"Preview already running at http://"
+					.. host
+					.. ":"
+					.. job_info.port
+					.. " for "
+					.. vim.fn.fnamemodify(filepath, ":t"),
+				vim.log.levels.WARN
+			)
+		else
+			notify("Preview already starting for " .. vim.fn.fnamemodify(filepath, ":t"), vim.log.levels.WARN)
+		end
 		return
 	end
 
 	-- Start the preview server
 	local cmd = build_args(filepath)
+
 	local job_id = vim.fn.jobstart(cmd, {
+		on_stdout = function(_, data)
+			if data then
+				for _, line in ipairs(data) do
+					if line ~= "" then
+						-- Try to parse port from output
+						local port = parse_port_from_output(line)
+						if port and active_jobs[filepath] then
+							active_jobs[filepath].port = port
+							local host = M.config.host
+							notify(
+								"Preview live at http://"
+									.. host
+									.. ":"
+									.. port
+									.. " for "
+									.. vim.fn.fnamemodify(filepath, ":t"),
+								vim.log.levels.INFO
+							)
+						end
+					end
+				end
+			end
+		end,
+		on_stderr = function(_, data)
+			if data then
+				for _, line in ipairs(data) do
+					if line ~= "" then
+						-- Port info might also be in stderr
+						local port = parse_port_from_output(line)
+						if port and active_jobs[filepath] then
+							active_jobs[filepath].port = port
+							local host = M.config.host
+							notify(
+								"Preview live at http://"
+									.. host
+									.. ":"
+									.. port
+									.. " for "
+									.. vim.fn.fnamemodify(filepath, ":t"),
+								vim.log.levels.INFO
+							)
+						end
+					end
+				end
+			end
+		end,
 		on_exit = function(_, exit_code)
 			active_jobs[filepath] = nil
 			if exit_code ~= 0 and exit_code ~= 143 then
 				notify("Preview server exited unexpectedly (code: " .. exit_code .. ")", vim.log.levels.ERROR)
 			end
 		end,
-		stdout_buffered = true,
-		stderr_buffered = true,
 	})
 
 	if job_id > 0 then
-		active_jobs[filepath] = job_id
-		notify(
-			"Preview is live for " .. vim.fn.fnamemodify(filepath, ":t") .. " - check your browser!",
-			vim.log.levels.INFO
-		)
+		active_jobs[filepath] = {
+			job_id = job_id,
+			port = nil, -- Will be populated when we parse stdout
+		}
+		notify("Starting preview for " .. vim.fn.fnamemodify(filepath, ":t") .. "...", vim.log.levels.INFO)
 	else
 		notify("Failed to start preview server.", vim.log.levels.ERROR)
 	end
@@ -135,8 +190,14 @@ function M.list_previews()
 	end
 
 	local lines = { "Active Previews:" }
-	for filepath, job_id in pairs(active_jobs) do
-		table.insert(lines, "  • " .. filepath .. " (job: " .. job_id .. ")")
+	local host = M.config.host
+	for filepath, job_info in pairs(active_jobs) do
+		if job_info.port then
+			local url = "http://" .. host .. ":" .. job_info.port
+			table.insert(lines, "  • " .. filepath .. " → " .. url)
+		else
+			table.insert(lines, "  • " .. filepath .. " → (starting...)")
+		end
 	end
 
 	notify(table.concat(lines, "\n"), vim.log.levels.INFO)
@@ -151,7 +212,7 @@ function M.kill_preview()
 		return
 	end
 
-	vim.fn.jobstop(active_jobs[filepath])
+	vim.fn.jobstop(active_jobs[filepath].job_id)
 	active_jobs[filepath] = nil
 	notify("Preview stopped for " .. vim.fn.fnamemodify(filepath, ":t"), vim.log.levels.INFO)
 end
@@ -164,8 +225,8 @@ function M.kill_all_previews()
 	end
 
 	local count = 0
-	for filepath, job_id in pairs(active_jobs) do
-		vim.fn.jobstop(job_id)
+	for _, job_info in pairs(active_jobs) do
+		vim.fn.jobstop(job_info.job_id)
 		count = count + 1
 	end
 
@@ -173,7 +234,6 @@ function M.kill_all_previews()
 	notify("Stopped " .. count .. " preview(s).", vim.log.levels.INFO)
 end
 
--- Setup function for configuration
 function M.setup(opts)
 	M.config = vim.tbl_deep_extend("force", M.config, opts or {})
 end
