@@ -10,7 +10,6 @@ M.config = {
 	host = "localhost",
 	port = 3333,
 	markdown_mode = false,
-	verbose = false,
 }
 
 -- Store active preview jobs
@@ -71,10 +70,6 @@ local function build_args(filepath)
 
 	if M.config.markdown_mode then
 		table.insert(args, "--markdown-mode")
-	end
-
-	if M.config.verbose then
-		table.insert(args, "--verbose")
 	end
 
 	table.insert(args, filepath)
