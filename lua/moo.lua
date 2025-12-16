@@ -4,9 +4,12 @@ local M = {}
 -- Store active preview jobs
 local active_jobs = {}
 
--- Check if gh-markdown-preview is in PATH
+-- Check if gh markdown-preview is available
 local function has_gh_preview()
-	return vim.fn.executable("gh-markdown-preview") == 1
+	local handle = io.popen("gh markdown-preview --help 2>&1")
+	local result = handle:read("*a")
+	handle:close()
+	return not result:match("unknown command") and not result:match("command not found")
 end
 
 -- Get current buffer file path
@@ -27,7 +30,10 @@ end
 -- Start preview for current buffer
 function M.preview()
 	if not has_gh_preview() then
-		notify("gh-markdown-preview not found in PATH. Please install it first.", vim.log.levels.ERROR)
+		notify(
+			"gh markdown-preview not available. Please install: gh extension install yusukebe/gh-markdown-preview",
+			vim.log.levels.ERROR
+		)
 		return
 	end
 
@@ -49,7 +55,8 @@ function M.preview()
 	end
 
 	-- Start the preview server
-	local job_id = vim.fn.jobstart({ "gh-markdown-preview", filepath }, {
+	local cmd = build_args(filepath)
+	local job_id = vim.fn.jobstart(cmd, {
 		on_exit = function(_, exit_code)
 			active_jobs[filepath] = nil
 			if exit_code ~= 0 and exit_code ~= 143 then
