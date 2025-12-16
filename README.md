@@ -2,6 +2,10 @@
 
 Shows a live markdown preview of the current buffer's `.md` file using the cli tool [gh-markdown-preview](https://github.com/yusukebe/gh-markdown-preview)
 
+<img width="710.8" height="400" alt="Notification inside Neovim" src="https://github.com/user-attachments/assets/e0027fdb-c21d-4d7e-ade4-1f54124ad4c8" />
+
+<img width="710.8" height="400" alt="Preview in Firefox" src="https://github.com/user-attachments/assets/0256d98c-e828-4eb8-989c-3aecac6ed066" />
+
 ## Requirements
 
 [Neovim](https://github.com/neovim/neovim) 0.8.0+
